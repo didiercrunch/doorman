@@ -3,8 +3,10 @@ package doorman
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"math"
+	"math/big"
 	mathrand "math/rand"
 	"net/http"
 	"sync"
@@ -15,11 +17,9 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-// the smallest value that makes two floats the same.  Consequently x == y
-// if |x - y| < epsilon.  It is a known issue that one can find three numbers
-// a,b,c such that a == b, b == c and a != c. Hence, it is the programmer role
-// to be very careful about equalities and inequalities.
-const epsilon float64 = 0.000000001
+var _ = fmt.Print
+
+var ONE *big.Rat = big.NewRat(1, 1)
 
 var rand *mathrand.Rand
 
@@ -32,25 +32,18 @@ func init() {
 	initRandomSeed()
 }
 
-func IsZero(f float64) bool {
-	if math.Abs(f) > epsilon {
-		return false
-	}
-	return true
-}
-
-func IsEqual(f1, f2 float64) bool {
-	return IsZero(f1 - f2)
+func IsEqual(f1, f2 *big.Rat) bool {
+	return f1.Cmp(f2) == 0
 }
 
 type Doorman struct {
 	Id                  bson.ObjectId  // the id of the doorman
 	LastChangeTimestamp int64          // an always increasing int that represent the last time the doorman has beed updated
-	Probabilities       []float64      //  The probability of each cases.  The sum of probabilities needs to be one
+	Probabilities       []*big.Rat     //  The probability of each cases.  The sum of probabilities needs to be one
 	wg                  sync.WaitGroup // waitgroup for goroutine safety
 }
 
-func NewDoorman(id bson.ObjectId, Probabilities []float64) *Doorman {
+func NewDoorman(id bson.ObjectId, Probabilities []*big.Rat) *Doorman {
 	wab := &Doorman{}
 	wab.Id = id
 	wab.Probabilities = Probabilities
@@ -86,7 +79,7 @@ func (w *Doorman) Update(wu *shared.DoormanUpdater) error {
 	defer w.wg.Done()
 	w.LastChangeTimestamp = wu.Timestamp
 
-	if !IsEqual(w.sum(wu.Probabilities), 1) {
+	if !IsEqual(w.sum(wu.Probabilities), ONE) {
 		return errors.New("the sum of probabilities cannot be different than 1")
 	}
 	w.Probabilities = wu.Probabilities
@@ -94,10 +87,10 @@ func (w *Doorman) Update(wu *shared.DoormanUpdater) error {
 	return nil
 }
 
-func (w *Doorman) sum(prob []float64) float64 {
-	var ret float64 = 0
+func (w *Doorman) sum(prob []*big.Rat) *big.Rat {
+	ret := big.NewRat(0, 1)
 	for _, p := range prob {
-		ret += p
+		ret = new(big.Rat).Add(ret, p)
 	}
 	return ret
 }
@@ -106,25 +99,26 @@ func (w *Doorman) Validate() error {
 	if len(w.Probabilities) == 0 {
 		return errors.New("not initiated")
 	}
-	if !IsZero(w.sum(w.Probabilities) - 1.0) {
+	s := w.sum(w.Probabilities)
+	if !IsEqual(s, ONE) {
 		return errors.New("The sum of probabilities is not one")
 	}
 	return nil
 }
 
-func (w *Doorman) GetCase(choosenRandomPosition float64) uint {
+func (w *Doorman) GetCase(choosenRandomPosition *big.Rat) uint {
 	w.wg.Wait()
-	var prob float64 = 0
+	var prob = big.NewRat(0, 1)
 	for i, p := range w.Probabilities {
-		prob += p
-		if choosenRandomPosition-epsilon < prob {
+		prob = new(big.Rat).Add(prob, p)
+		if choosenRandomPosition.Cmp(prob) <= 0 {
 			return uint(i)
 		}
 	}
 	panic("cannot have a probability above 1")
 }
 
-func (w *Doorman) GenerateRandomProbabilityFromInteger(data uint64) float64 {
+func (w *Doorman) GenerateRandomProbabilityFromInteger(data uint64) *big.Rat {
 	var ret float64 = 0
 	for i := 0; data > 0; i++ {
 		if data&1 == 1 {
@@ -132,7 +126,8 @@ func (w *Doorman) GenerateRandomProbabilityFromInteger(data uint64) float64 {
 		}
 		data >>= 1
 	}
-	return ret
+	rat := new(big.Rat)
+	return rat.SetFloat64(ret)
 }
 
 func (w *Doorman) Hash(data ...[]byte) uint64 {
@@ -149,5 +144,6 @@ func (w *Doorman) GetCaseFromData(data ...[]byte) uint {
 }
 
 func (w *Doorman) GetRandomCase() uint {
-	return w.GetCase(rand.Float64())
+	r := rand.Float64()
+	return w.GetCase(new(big.Rat).SetFloat64(r))
 }

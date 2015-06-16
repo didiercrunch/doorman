@@ -10,7 +10,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-var wab = doorman.NewDoorman(bson.ObjectIdHex("54b33d5ef6fb5e3b77000001"), []float64{0.25, 0.5, 0.10, 0.05, 0.1})
+var wab = doorman.NewDoorman(bson.ObjectIdHex("55048bfff6fb5e213d000001"), []float64{0.25, 0.5, 0.10, 0.05, 0.1})
 
 func init() {
 	if err := wab.NanoMsgSubscriber("tcp://127.0.0.1:40899"); err != nil {
