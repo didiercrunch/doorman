@@ -3,17 +3,28 @@ package main
 import (
 	"html/template"
 	"log"
+	"math/big"
+	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 
 	"github.com/didiercrunch/doorman"
 	"gopkg.in/mgo.v2/bson"
 )
 
-var wab = doorman.NewDoorman(bson.ObjectIdHex("55048bfff6fb5e213d000001"), []float64{0.25, 0.5, 0.10, 0.05, 0.1})
+func getProbs(probs ...float64) []*big.Rat {
+	ret := make([]*big.Rat, len(probs))
+	for i, p := range probs {
+		ret[i] = new(big.Rat).SetFloat64(p)
+	}
+	return ret
+}
+
+var wab = doorman.New(bson.ObjectIdHex("558701a2f6fb5e29a4000003"), getProbs(1, 0, 0))
 
 func init() {
-	if err := wab.NanoMsgSubscriber("tcp://127.0.0.1:40899"); err != nil {
+	if err := wab.Subscriber("http://localhost:1999"); err != nil {
 		panic(err)
 	}
 }
@@ -21,15 +32,11 @@ func init() {
 func GetDoormanValue(r *http.Request) (string, int) {
 	switch wab.GetCaseFromData([]byte(r.URL.String())) {
 	case 0:
-		return "blue", 0
+		return "red", 0
 	case 1:
-		return "red", 1
+		return "green", 1
 	case 2:
-		return "pink", 2
-	case 3:
-		return "yellow", 3
-	case 4:
-		return "magenta", 4
+		return "blue", 2
 	}
 	log.Panic("impossible value returned by doorman")
 	return "", 0
@@ -43,8 +50,10 @@ var tmpl = `
 		<h1 style="text-align:center;">the doorman value is {{ .value }}</h1>
 		<p style="text-align:center;">
 			this doorman depend solely on the url.  If you hit different url you
-			will have different doorman results.
+			will have different doorman results.  For example, here is a random
+			url: <a href="{{ .nextUrl }}" style="color: black;"> {{ .nextUrl }} </a>
 		</p>
+
 	</body>
 </html>
 `
@@ -56,6 +65,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	m := make(map[string]interface{})
 	m["color"], m["value"] = GetDoormanValue(r)
+	m["nextUrl"] = "/" + strconv.Itoa(rand.Int())
 	if err := t.Execute(w, m); err != nil {
 		panic(err)
 	}

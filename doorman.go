@@ -3,7 +3,6 @@ package doorman
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"math"
 	"math/big"
@@ -16,8 +15,6 @@ import (
 	"github.com/didiercrunch/doorman/shared"
 	"gopkg.in/mgo.v2/bson"
 )
-
-var _ = fmt.Print
 
 var ONE *big.Rat = big.NewRat(1, 1)
 
@@ -43,7 +40,7 @@ type Doorman struct {
 	wg                  sync.WaitGroup // waitgroup for goroutine safety
 }
 
-func NewDoorman(id bson.ObjectId, Probabilities []*big.Rat) *Doorman {
+func New(id bson.ObjectId, Probabilities []*big.Rat) *Doorman {
 	wab := &Doorman{}
 	wab.Id = id
 	wab.Probabilities = Probabilities
@@ -141,6 +138,10 @@ func (w *Doorman) Hash(data ...[]byte) uint64 {
 func (w *Doorman) GetCaseFromData(data ...[]byte) uint {
 	random := w.GenerateRandomProbabilityFromInteger(w.Hash(data...))
 	return w.GetCase(random)
+}
+
+func (w *Doorman) GetCaseFromString(data string) uint {
+	return w.GetCaseFromData([]byte(data))
 }
 
 func (w *Doorman) GetRandomCase() uint {

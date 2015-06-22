@@ -18,22 +18,16 @@ import (
 var epsilon = 0.0
 var ZERO = big.NewRat(0, 1)
 
-func assertIsAbout(t *testing.T, expected, received *big.Rat) {
+func assertIsEqual(t *testing.T, expected, received *big.Rat) {
 	if expected.Cmp(received) != 0 {
 		t.Error("received", received, "but expected", expected)
-	}
-}
-
-func assertIsNotAbout(t *testing.T, expected, received *big.Rat) {
-	if expected.Cmp(received) != 0 {
-		t.Error("received", received, "but expected something different than", expected)
 	}
 }
 
 func getProbs(probs ...float64) []*big.Rat {
 	ret := make([]*big.Rat, len(probs))
 	for i, p := range probs {
-		ret[i], _ = new(big.Rat).SetString(fmt.Sprint(p))
+		ret[i] = new(big.Rat).SetFloat64(p)
 	}
 	return ret
 }
@@ -72,7 +66,7 @@ func TestValidate(t *testing.T) {
 }
 
 func TestGetCase(t *testing.T) {
-	w := NewDoorman(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
+	w := New(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
 	if c := w.GetCase(ZERO); c != 0 {
 		t.Error("expected 0 but received", c)
 	}
@@ -83,7 +77,7 @@ func TestGetCase(t *testing.T) {
 }
 
 func TestGetCaseCoroutineSafety(t *testing.T) {
-	w := NewDoorman(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
+	w := New(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
 	i := 0
 	w.wg.Add(1)
 	go func() {
@@ -98,11 +92,11 @@ func TestGetCaseCoroutineSafety(t *testing.T) {
 
 func TestGenerateRandomProbabilityFromBitSlice(t *testing.T) {
 	w := new(Doorman)
-	assertIsAbout(t, big.NewRat(1, 2), w.GenerateRandomProbabilityFromInteger(1))
+	assertIsEqual(t, big.NewRat(1, 2), w.GenerateRandomProbabilityFromInteger(1))
 
-	//	assertIsAbout(t, 0.5+0*0.25+1*0.125, w.GenerateRandomProbabilityFromInteger(5))
+	assertIsEqual(t, new(big.Rat).SetFloat64(0.5+0*0.25+1*0.125), w.GenerateRandomProbabilityFromInteger(5))
 
-	assertIsAbout(t, ONE, w.GenerateRandomProbabilityFromInteger(math.MaxUint64))
+	assertIsEqual(t, ONE, w.GenerateRandomProbabilityFromInteger(math.MaxUint64))
 }
 
 func TestHash(t *testing.T) {
@@ -166,7 +160,7 @@ func randomBytes(n int) []byte {
 
 func TestUpdateHard(t *testing.T) {
 
-	wab := NewDoorman(bson.ObjectIdHex(oid), getProbs())
+	wab := New(bson.ObjectIdHex(oid), getProbs())
 	createMessage := func() string {
 		msg := &shared.DoormanUpdater{Timestamp: 2, Probabilities: getProbs(0.5, 0.25, 0.25), Id: oid}
 		if ret, err := json.Marshal(msg); err != nil {
@@ -209,7 +203,7 @@ func IsExtremeBinomialResult(x int, n, p float64) error {
 func TestGetRandomCase(t *testing.T) {
 	p := 0.5
 	n := 10000
-	wab := NewDoorman(bson.NewObjectId(), getProbs(p, 1-p))
+	wab := New(bson.NewObjectId(), getProbs(p, 1-p))
 	var sum = 0
 	for i := 0; i < n; i++ {
 		sum += int(wab.GetRandomCase())
@@ -220,9 +214,22 @@ func TestGetRandomCase(t *testing.T) {
 	}
 }
 
+func TestGetCaseFromString(t *testing.T) {
+	w := New(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
+	expts := map[string]uint{
+		"j'aime la ratoutille": 2,
+	}
+	for data, expt := range expts {
+		if res := w.GetCaseFromString(data); res != expt {
+			t.Error("incorrect results for: ", data, res)
+		}
+	}
+
+}
+
 func BenchmarkGetCaseFromData(b *testing.B) {
 	var data = randomBytes(1024 * 1024)
-	w := NewDoorman(bson.NewObjectId(), getProbs(0.1, 0.4, 0.4, 0.05, 0.05))
+	w := New(bson.NewObjectId(), getProbs(0.1, 0.4, 0.4, 0.05, 0.05))
 	for i := 0; i < b.N; i++ {
 		w.GetCaseFromData(data)
 	}
