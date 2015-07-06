@@ -3,12 +3,10 @@ package httpsubscriber
 import (
 	"encoding/json"
 	"errors"
+	"github.com/didiercrunch/doorman/shared"
 	"log"
 	"net/http"
 	"time"
-
-	"github.com/didiercrunch/doorman/shared"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type HttpSubscriber struct {
@@ -39,7 +37,7 @@ func (s *HttpSubscriber) callUpdateHandlerFunction(f shared.UpdateHandlerFunc, d
 	}
 }
 
-func (s *HttpSubscriber) Subscribe(abtestId bson.ObjectId, update shared.UpdateHandlerFunc) error {
+func (s *HttpSubscriber) Subscribe(abtestId string, update shared.UpdateHandlerFunc) error {
 	go func() {
 		c := time.Tick(s.HartBeat)
 		for _ = range c {

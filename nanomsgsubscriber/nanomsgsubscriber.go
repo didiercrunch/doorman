@@ -10,7 +10,6 @@ import (
 	"github.com/gdamore/mangos/protocol/sub"
 	"github.com/gdamore/mangos/transport/ipc"
 	"github.com/gdamore/mangos/transport/tcp"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type NanoMsgSubscriber struct {
@@ -26,7 +25,7 @@ func (s *NanoMsgSubscriber) callUpdateHandlerFunction(f shared.UpdateHandlerFunc
 	}
 }
 
-func (s *NanoMsgSubscriber) Subscribe(abtestId bson.ObjectId, update shared.UpdateHandlerFunc) error {
+func (s *NanoMsgSubscriber) Subscribe(abtestId string, update shared.UpdateHandlerFunc) error {
 	var sock mangos.Socket
 	var err error
 	var msg []byte

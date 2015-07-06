@@ -1,6 +1,7 @@
 package doorman
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,14 +10,26 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strconv"
 	"testing"
 
 	"github.com/didiercrunch/doorman/shared"
-	"gopkg.in/mgo.v2/bson"
 )
 
+const oid = "507f1f77bcf86cd799439011"
+
 var epsilon = 0.0
+
 var ZERO = big.NewRat(0, 1)
+
+func newDoorman(probabilities []*big.Rat) *Doorman {
+	id := base64.URLEncoding.EncodeToString(make([]byte, 16))
+	if ret, err := New(id, probabilities); err != nil {
+		panic(err)
+	} else {
+		return ret
+	}
+}
 
 func assertIsEqual(t *testing.T, expected, received *big.Rat) {
 	if expected.Cmp(received) != 0 {
@@ -24,15 +37,31 @@ func assertIsEqual(t *testing.T, expected, received *big.Rat) {
 	}
 }
 
-func getProbs(probs ...float64) []*big.Rat {
+func getProbs(probs ...string) []*big.Rat {
 	ret := make([]*big.Rat, len(probs))
+	var ok bool
 	for i, p := range probs {
-		ret[i] = new(big.Rat).SetFloat64(p)
+		if ret[i], ok = new(big.Rat).SetString(p); !ok {
+			panic(p)
+		}
 	}
 	return ret
 }
 
-var oid = "507f1f77bcf86cd799439011"
+func TestNew(t *testing.T) {
+	notBase64 := "this is not url encoded base 64 /"
+	if _, err := New(notBase64, getProbs("1/4", "3/4")); err == nil {
+		t.Error()
+	}
+	base64OfAndArrayOfLength15 := "MTIzNDU2Nzg5MDEyMzQ1"
+	if _, err := New(base64OfAndArrayOfLength15, getProbs("1/4", "3/4")); err == nil {
+		t.Error()
+	}
+	goodId := "MTIzNDU2Nzg5MDEyMzQ1Ng=="
+	if _, err := New(goodId, getProbs("1/4", "1/4")); err == nil {
+		t.Error()
+	}
+}
 
 func TestIsEqual(t *testing.T) {
 	if !IsEqual(big.NewRat(2, 2), big.NewRat(1, 1)) {
@@ -49,24 +78,24 @@ func TestValidate(t *testing.T) {
 		t.Error()
 	}
 
-	w = &Doorman{Probabilities: getProbs(0.5, 0.75)}
+	w = &Doorman{Probabilities: getProbs("2/4", "3/4")}
 	if w.Validate().Error() != "The sum of probabilities is not one" {
 		t.Error()
 	}
 
-	w = &Doorman{Probabilities: getProbs(0.25, 0.75)}
+	w = &Doorman{Probabilities: getProbs("1/4", "3/4")}
 	if w.Validate() != nil {
 		t.Error()
 	}
 
-	w = &Doorman{Probabilities: getProbs(0.2500000000002, 0.75)}
+	w = &Doorman{Probabilities: getProbs("100000001/400000000", "3/4")}
 	if w.Validate() == nil {
 		t.Error("even very small diff should be significative")
 	}
 }
 
 func TestGetCase(t *testing.T) {
-	w := New(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
+	w := newDoorman(getProbs("1/4", "2/4", "1/4"))
 	if c := w.GetCase(ZERO); c != 0 {
 		t.Error("expected 0 but received", c)
 	}
@@ -77,7 +106,7 @@ func TestGetCase(t *testing.T) {
 }
 
 func TestGetCaseCoroutineSafety(t *testing.T) {
-	w := New(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
+	w := newDoorman(getProbs("1/4", "2/4", "1/4"))
 	i := 0
 	w.wg.Add(1)
 	go func() {
@@ -111,8 +140,7 @@ func TestHash(t *testing.T) {
 }
 
 func TestUpdateTimestamp(t *testing.T) {
-
-	w := &Doorman{LastChangeTimestamp: 10, Id: bson.ObjectIdHex(oid)}
+	w := &Doorman{LastChangeTimestamp: 10, Id: oid}
 	m := &shared.DoormanUpdater{Timestamp: 9}
 	w.Update(m)
 	if w.LastChangeTimestamp != 10 {
@@ -127,24 +155,24 @@ func TestUpdateTimestamp(t *testing.T) {
 }
 
 func TestUpdateProbabilities(t *testing.T) {
-	w := &Doorman{LastChangeTimestamp: 0, Id: bson.ObjectIdHex(oid)}
-	m := &shared.DoormanUpdater{Timestamp: 0, Probabilities: getProbs(0.5, 0.5), Id: oid}
+	w := &Doorman{LastChangeTimestamp: 0, Id: oid}
+	m := &shared.DoormanUpdater{Timestamp: 0, Probabilities: getProbs("1/2", "1/2"), Id: oid}
 	w.Update(m)
 	if len(w.Probabilities) != 0 {
 		t.Error()
 	}
 
-	m = &shared.DoormanUpdater{Timestamp: 2, Probabilities: getProbs(0.5, 0.5), Id: oid}
+	m = &shared.DoormanUpdater{Timestamp: 2, Probabilities: getProbs("1/2", "1/2"), Id: oid}
 	if err := w.Update(m); err != nil {
 		t.Error(err)
-	} else if !reflect.DeepEqual(w.Probabilities, getProbs(0.5, 0.5)) {
+	} else if !reflect.DeepEqual(w.Probabilities, getProbs("1/2", "1/2")) {
 		t.Error("bad prob")
 	}
 
-	m = &shared.DoormanUpdater{Timestamp: 3, Probabilities: getProbs(0.5, 0.25), Id: oid}
+	m = &shared.DoormanUpdater{Timestamp: 3, Probabilities: getProbs("1/2", "1/4"), Id: oid}
 	if err := w.Update(m); err == nil {
 		t.Error("should received an error")
-	} else if !reflect.DeepEqual(w.Probabilities, getProbs(0.5, 0.5)) {
+	} else if !reflect.DeepEqual(w.Probabilities, getProbs("1/2", "1/2")) {
 		t.Error("bad prob")
 	}
 
@@ -160,9 +188,10 @@ func randomBytes(n int) []byte {
 
 func TestUpdateHard(t *testing.T) {
 
-	wab := New(bson.ObjectIdHex(oid), getProbs())
+	wab := newDoorman(getProbs("1/3", "1/3", "1/3"))
+	wab.Id = oid
 	createMessage := func() string {
-		msg := &shared.DoormanUpdater{Timestamp: 2, Probabilities: getProbs(0.5, 0.25, 0.25), Id: oid}
+		msg := &shared.DoormanUpdater{Timestamp: 2, Probabilities: getProbs("1/2", "1/4", "1/4"), Id: oid}
 		if ret, err := json.Marshal(msg); err != nil {
 			panic(err)
 		} else {
@@ -170,7 +199,7 @@ func TestUpdateHard(t *testing.T) {
 		}
 	}
 	handler := func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/"+wab.Id.Hex() {
+		if r.URL.Path != "/"+wab.Id {
 			t.Error("bad url", r.URL)
 		}
 		fmt.Fprint(w, createMessage())
@@ -181,8 +210,8 @@ func TestUpdateHard(t *testing.T) {
 	if err := wab.UpdateHard(ts.URL); err != nil {
 		t.Error(err)
 	}
-	if wab.Length() != 3 {
-		t.Error()
+	if l := wab.Length(); l != 3 {
+		t.Error(l)
 	}
 }
 
@@ -203,7 +232,7 @@ func IsExtremeBinomialResult(x int, n, p float64) error {
 func TestGetRandomCase(t *testing.T) {
 	p := 0.5
 	n := 10000
-	wab := New(bson.NewObjectId(), getProbs(p, 1-p))
+	wab := newDoorman(getProbs("1/2", "1/2"))
 	var sum = 0
 	for i := 0; i < n; i++ {
 		sum += int(wab.GetRandomCase())
@@ -215,21 +244,49 @@ func TestGetRandomCase(t *testing.T) {
 }
 
 func TestGetCaseFromString(t *testing.T) {
-	w := New(bson.NewObjectId(), getProbs(0.25, 0.5, 0.25))
+	w := newDoorman(getProbs("1/4", "1/2", "1/4"))
 	expts := map[string]uint{
-		"j'aime la ratoutille": 2,
+		"Հայաստան..":   2,
+		"საქართველო":   1,
+		"Azərbaycan..": 0,
 	}
 	for data, expt := range expts {
 		if res := w.GetCaseFromString(data); res != expt {
 			t.Error("incorrect results for: ", data, res)
 		}
 	}
+}
 
+func TestConsistencyOfDoormenWhenProbabilityChanges(t *testing.T) {
+	w := "dddddddddddddddddddddd"
+	for i := 1; i < 100; i++ {
+		doorman := newDoorman(getProbs(strconv.Itoa(i)+"/100", strconv.Itoa(100-i)+"/100"))
+		if doorman.GetCaseFromString(w) != 0 {
+			t.Error()
+		}
+	}
+}
+
+// bellow test is not yet in doorman's specification.  It is not clear how
+//we want to hash numbers because of the many number types in many programming
+// language
+func _TestGetCaseFromInt(t *testing.T) {
+	w := newDoorman(getProbs("1/4", "1/2", "1/4"))
+	expts := map[int]uint{
+		2:   2,
+		13:  2,
+		195: 1,
+	}
+	for data, expt := range expts {
+		if res := w.getCaseFromInt(data); res != expt {
+			t.Error("incorrect results for: ", data, res)
+		}
+	}
 }
 
 func BenchmarkGetCaseFromData(b *testing.B) {
 	var data = randomBytes(1024 * 1024)
-	w := New(bson.NewObjectId(), getProbs(0.1, 0.4, 0.4, 0.05, 0.05))
+	w := newDoorman(getProbs("10/100", "40/100", "40/100", "5/100", "5/100"))
 	for i := 0; i < b.N; i++ {
 		w.GetCaseFromData(data)
 	}

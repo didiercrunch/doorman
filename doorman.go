@@ -1,6 +1,8 @@
 package doorman
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"log"
@@ -13,7 +15,6 @@ import (
 
 	"github.com/dchest/siphash"
 	"github.com/didiercrunch/doorman/shared"
-	"gopkg.in/mgo.v2/bson"
 )
 
 var ONE *big.Rat = big.NewRat(1, 1)
@@ -34,17 +35,21 @@ func IsEqual(f1, f2 *big.Rat) bool {
 }
 
 type Doorman struct {
-	Id                  bson.ObjectId  // the id of the doorman
+	Id                  string         // the id of the doorman
 	LastChangeTimestamp int64          // an always increasing int that represent the last time the doorman has beed updated
 	Probabilities       []*big.Rat     //  The probability of each cases.  The sum of probabilities needs to be one
 	wg                  sync.WaitGroup // waitgroup for goroutine safety
 }
 
-func New(id bson.ObjectId, Probabilities []*big.Rat) *Doorman {
+func New(id string, probabilities []*big.Rat) (*Doorman, error) {
 	wab := &Doorman{}
-	wab.Id = id
-	wab.Probabilities = Probabilities
-	return wab
+	if bid, err := base64.URLEncoding.DecodeString(id); err != nil {
+		return nil, err
+	} else if len(bid) != 16 {
+		return nil, errors.New("id must be base64 encoded of a 16 bytes array")
+	}
+	wab.Probabilities = probabilities
+	return wab, wab.Validate()
 }
 
 func (w *Doorman) Length() int {
@@ -52,7 +57,7 @@ func (w *Doorman) Length() int {
 }
 
 func (w *Doorman) UpdateHard(baseURL string) error {
-	r, err := http.Get(baseURL + "/" + w.Id.Hex())
+	r, err := http.Get(baseURL + "/" + w.Id)
 	if err != nil {
 		return err
 	}
@@ -69,7 +74,7 @@ func (w *Doorman) Update(wu *shared.DoormanUpdater) error {
 	if wu.Timestamp <= w.LastChangeTimestamp {
 		return nil
 	}
-	if wu.Id != w.Id.Hex() {
+	if w.Id != wu.Id {
 		return errors.New("bad doorman id")
 	}
 	w.wg.Add(1)
@@ -142,6 +147,13 @@ func (w *Doorman) GetCaseFromData(data ...[]byte) uint {
 
 func (w *Doorman) GetCaseFromString(data string) uint {
 	return w.GetCaseFromData([]byte(data))
+}
+
+// not yet in spect
+func (w *Doorman) getCaseFromInt(data int) uint {
+	b := make([]byte, 10)
+	binary.LittleEndian.PutUint64(b, uint64(data))
+	return w.GetCaseFromData(b)
 }
 
 func (w *Doorman) GetRandomCase() uint {

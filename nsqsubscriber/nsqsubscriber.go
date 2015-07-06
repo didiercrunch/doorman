@@ -6,7 +6,6 @@ import (
 	"code.google.com/p/go-uuid/uuid"
 	"github.com/bitly/go-nsq"
 	"github.com/didiercrunch/doorman/shared"
-	"gopkg.in/mgo.v2/bson"
 )
 
 var UUID = uuid.New()
@@ -26,9 +25,9 @@ func toNSQHandlerFunc(update shared.UpdateHandlerFunc) nsq.HandlerFunc {
 	}
 }
 
-func (sub *NSQSubscriber) Subscribe(doormanId bson.ObjectId, update shared.UpdateHandlerFunc) error {
+func (sub *NSQSubscriber) Subscribe(doormanId string, update shared.UpdateHandlerFunc) error {
 	config := nsq.NewConfig()
-	q, err := nsq.NewConsumer(doormanId.Hex(), UUID, config)
+	q, err := nsq.NewConsumer(doormanId, UUID, config)
 	if err != nil {
 		return err
 	}

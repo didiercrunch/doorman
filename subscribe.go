@@ -5,11 +5,10 @@ import (
 	"github.com/didiercrunch/doorman/nsqsubscriber"
 	"github.com/didiercrunch/doorman/shared"
 	"github.com/didiercrunch/doorman/subscriber"
-	"gopkg.in/mgo.v2/bson"
 )
 
 type Subscriber interface {
-	Subscribe(doormanId bson.ObjectId, update shared.UpdateHandlerFunc) error
+	Subscribe(doormanId string, update shared.UpdateHandlerFunc) error
 }
 
 func (w *Doorman) subscribe(sub Subscriber) error {
