@@ -39,6 +39,7 @@ type Doorman struct {
 	LastChangeTimestamp int64          // an always increasing int that represent the last time the doorman has beed updated
 	Probabilities       []*big.Rat     //  The probability of each cases.  The sum of probabilities needs to be one
 	wg                  sync.WaitGroup // waitgroup for goroutine safety
+	hashKey             []byte         // the decoded id
 }
 
 func New(id string, probabilities []*big.Rat) (*Doorman, error) {
@@ -47,6 +48,9 @@ func New(id string, probabilities []*big.Rat) (*Doorman, error) {
 		return nil, err
 	} else if len(bid) != 16 {
 		return nil, errors.New("id must be base64 encoded of a 16 bytes array")
+	} else {
+		wab.hashKey = bid
+		wab.Id = id
 	}
 	wab.Probabilities = probabilities
 	return wab, wab.Validate()
@@ -133,7 +137,7 @@ func (w *Doorman) GenerateRandomProbabilityFromInteger(data uint64) *big.Rat {
 }
 
 func (w *Doorman) Hash(data ...[]byte) uint64 {
-	h := siphash.New(make([]byte, 16))
+	h := siphash.New(w.hashKey)
 	for _, datum := range data {
 		h.Write(datum)
 	}

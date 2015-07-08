@@ -58,7 +58,9 @@ func TestNew(t *testing.T) {
 		t.Error()
 	}
 	goodId := "MTIzNDU2Nzg5MDEyMzQ1Ng=="
-	if _, err := New(goodId, getProbs("1/4", "1/4")); err == nil {
+	if dm, err := New(goodId, getProbs("1/4", "1/4")); err == nil {
+		t.Error()
+	} else if dm.Id != goodId {
 		t.Error()
 	}
 }
@@ -131,6 +133,7 @@ func TestGenerateRandomProbabilityFromBitSlice(t *testing.T) {
 func TestHash(t *testing.T) {
 	m := []byte("doormen are great")
 	w := new(Doorman)
+	w.hashKey = make([]byte, 16)
 	var expt uint64 = 0x3973fc1b3e324215
 	result := w.Hash(m)
 

@@ -10,7 +10,6 @@ import (
 	"strconv"
 
 	"github.com/didiercrunch/doorman"
-	"gopkg.in/mgo.v2/bson"
 )
 
 func getProbs(probs ...float64) []*big.Rat {
@@ -21,9 +20,13 @@ func getProbs(probs ...float64) []*big.Rat {
 	return ret
 }
 
-var wab = doorman.New(bson.ObjectIdHex("558701a2f6fb5e29a4000003"), getProbs(1, 0, 0))
+var wab *doorman.Doorman
 
 func init() {
+	var err error
+	if wab, err = doorman.New("zST8_FWcPDT2-14wDQAAAQ==", getProbs(1, 0, 0)); err != nil {
+		panic(err)
+	}
 	if err := wab.Subscriber("http://localhost:1999"); err != nil {
 		panic(err)
 	}
@@ -47,12 +50,15 @@ var tmpl = `
 <html>
 	<head></head>
 	<body style="background:{{ .color }};width:100%;height:100%">
+		<div style="width: 62.5rem;">
 		<h1 style="text-align:center;">the doorman value is {{ .value }}</h1>
 		<p style="text-align:center;">
-			this doorman depend solely on the url.  If you hit different url you
+			This doorman depend solely on the url.  If you hit different url you
 			will have different doorman results.  For example, here is a random
 			url: <a href="{{ .nextUrl }}" style="color: black;"> {{ .nextUrl }} </a>
 		</p>
+
+		</div>
 
 	</body>
 </html>
@@ -84,5 +90,4 @@ func main() {
 	port := getPort()
 	log.Println("serving on port", port)
 	log.Fatal(http.ListenAndServe(":"+port, nil))
-
 }
