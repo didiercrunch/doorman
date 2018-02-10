@@ -6,10 +6,10 @@ import (
 	"log"
 
 	"github.com/didiercrunch/doorman/shared"
-	"github.com/gdamore/mangos"
-	"github.com/gdamore/mangos/protocol/sub"
-	"github.com/gdamore/mangos/transport/ipc"
-	"github.com/gdamore/mangos/transport/tcp"
+	"github.com/go-mangos/mangos"
+	"github.com/go-mangos/mangos/protocol/sub"
+	"github.com/go-mangos/mangos/transport/ipc"
+	"github.com/go-mangos/mangos/transport/tcp"
 )
 
 type NanoMsgSubscriber struct {

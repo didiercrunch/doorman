@@ -3,7 +3,7 @@ package nsqsubscriber
 import (
 	"encoding/json"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 	"github.com/bitly/go-nsq"
 	"github.com/didiercrunch/doorman/shared"
 )

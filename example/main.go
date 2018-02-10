@@ -24,7 +24,7 @@ var wab *doorman.Doorman
 
 func init() {
 	var err error
-	if wab, err = doorman.New("zST8_FWcPDT2-14wDQAAAQ==", getProbs(1, 0, 0)); err != nil {
+	if wab, err = doorman.New("XapIHlp_JIxFReURP8Ouyg==", getProbs(1, 0, 0)); err != nil {
 		panic(err)
 	}
 	if err := wab.Subscriber("http://localhost:1999"); err != nil {
